@@ -10,13 +10,20 @@ import {
 import type { Connector, QQVerification, SystemStatus } from './api';
 import Inbox from './Inbox';
 import AwayDesk from './AwayDesk';
+import WechatWorkspace from './WechatWorkspace';
 import { BrandLockup, RelaySymbol } from './brand/Brand';
 import type { AIDraftBuffer } from './ai-api';
 import { useServiceSession } from './useServiceSession';
 import type { ServiceSession as Session } from './useServiceSession';
 
 type Page =
-  'away' | 'overview' | 'messages' | 'contacts' | 'approvals' | 'settings';
+  | 'wechat'
+  | 'away'
+  | 'overview'
+  | 'messages'
+  | 'contacts'
+  | 'approvals'
+  | 'settings';
 type IconName =
   | 'overview'
   | 'messages'
@@ -29,14 +36,16 @@ type IconName =
   | 'plug'
   | 'leaf';
 const NAVIGATION: { page: Page; label: string; icon: IconName }[] = [
-  { page: 'away', label: '接班', icon: 'overview' },
+  { page: 'wechat', label: '微信工作台', icon: 'messages' },
+  { page: 'away', label: '邮箱交接', icon: 'overview' },
   { page: 'overview', label: '概览', icon: 'overview' },
   { page: 'messages', label: '消息', icon: 'messages' },
   { page: 'contacts', label: '联系人', icon: 'contacts' },
   { page: 'approvals', label: '待审批', icon: 'approvals' },
 ];
 const PAGE_TITLES: Record<Page, string> = {
-  away: '接班',
+  wechat: '微信工作台',
+  away: '邮箱交接',
   overview: '概览',
   messages: '消息',
   contacts: '联系人',
@@ -727,6 +736,7 @@ function Settings({
   onCancel,
   onSystemUpdate,
   onAuthFailure,
+  onWechat,
 }: {
   session: Session;
   activeToken: string;
@@ -739,6 +749,7 @@ function Settings({
   onCancel: () => void;
   onSystemUpdate: (system: SystemStatus) => void;
   onAuthFailure: () => void;
+  onWechat: () => void;
 }) {
   const connecting = session.status === 'connecting';
   return (
@@ -831,12 +842,45 @@ function Settings({
           </div>
         </form>
       </section>
-      <QQSettings
-        key={activeToken}
-        token={activeToken}
-        onSystemUpdate={onSystemUpdate}
-        onAuthFailure={onAuthFailure}
-      />
+      <section
+        className="settings-panel"
+        aria-labelledby="wechat-settings-title"
+      >
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">WECHAT · READ ONLY</p>
+            <h2 id="wechat-settings-title">微信私聊</h2>
+          </div>
+          <span className="label">本机接入</span>
+        </div>
+        <p className="page-description">
+          先在 Windows 微信 4.x
+          上完成本机配置，再回到微信工作台选择关注的人。后台只读保存消息，AI
+          由你按需发起。
+        </p>
+        <div className="form-actions">
+          <button className="button button-primary" onClick={onWechat}>
+            前往微信工作台 <Icon name="arrow" size={16} />
+          </button>
+          <a
+            className="button button-quiet"
+            href="https://github.com/qilinbro/msg-manager/blob/main/docs/wechat-db-setup.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            查看接入说明 ↗
+          </a>
+        </div>
+      </section>
+      <details className="development-details">
+        <summary>其他连接 · QQ 账号核验</summary>
+        <QQSettings
+          key={activeToken}
+          token={activeToken}
+          onSystemUpdate={onSystemUpdate}
+          onAuthFailure={onAuthFailure}
+        />
+      </details>
       <section className="settings-panel" aria-labelledby="automation-title">
         <div className="section-heading">
           <div>
@@ -861,7 +905,9 @@ function Settings({
         <div className="settings-row">
           <div>
             <h3>后台自动化</h3>
-            <p>当前仅读取状态与核验 QQ 身份，不执行收发或审批操作。</p>
+            <p>
+              微信私聊需明确选择并开启后台读取；邮箱离席交接单独授权。这里显示服务状态，不会开始读取或发送。
+            </p>
           </div>
           <span className="subtle-note">
             {session.system
@@ -901,11 +947,11 @@ function Settings({
           </div>
         </dl>
         <p>
-          接班让重要来信在你离席期间变成可核对的任务和待审回信。
-          在指定发件人和授权时段内，独立后台可以持续检查邮箱；关闭窗口后，电脑和后台仍需保持运行。
-          统一消息中心支持加密存储、手动 AI 整理与选定微信私聊的后台只读。 QQ
-          OneBot 当前仅核验身份。回信保存为草稿，发送由你决定。 真实 QQ
-          邮箱三轮验收与原生桌面验收尚待完成。
+          接班把关注的微信私聊保存在本机，原文、整理结果和回复草稿放在一起。
+          你选择关注的人并开启后台读取；需要 AI 帮忙时，再核对范围、手动发起。
+          邮箱交接是独立的离席授权流程，可把指定来信整理成任务与待审回信。
+          关闭窗口后，电脑和后台仍需保持运行。草稿不会自动发送。 QQ OneBot
+          当前仅核验身份；真实微信、QQ 邮箱三轮和原生桌面验收仍待完成。
         </p>
       </details>
     </>
@@ -913,7 +959,7 @@ function Settings({
 }
 
 export default function App() {
-  const [page, setPage] = useState<Page>('overview');
+  const [page, setPage] = useState<Page>('wechat');
   const [aiDrafts] = useState(() => new Map<string, AIDraftBuffer>());
   const {
     session,
@@ -937,6 +983,17 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', warnUnsaved);
   }, [aiDrafts]);
   const onSettings = useCallback(() => setPage('settings'), []);
+  if (page === 'wechat')
+    return (
+      <WechatWorkspace
+        token={activeToken}
+        aiDrafts={aiDrafts}
+        onSettings={onSettings}
+        onAuthFailure={onAuthFailure}
+        onEmail={() => setPage('away')}
+        onInbox={() => setPage('messages')}
+      />
+    );
   if (page === 'away') {
     return (
       <AwayDesk
@@ -944,7 +1001,7 @@ export default function App() {
         token={activeToken}
         onSettings={onSettings}
         onAuthFailure={onAuthFailure}
-        onBack={() => setPage('overview')}
+        onBack={() => setPage('wechat')}
       />
     );
   }
@@ -1031,6 +1088,7 @@ export default function App() {
             />
           ) : page === 'settings' ? (
             <Settings
+              onWechat={() => setPage('wechat')}
               session={session}
               activeToken={activeToken}
               tokenDraft={tokenDraft}

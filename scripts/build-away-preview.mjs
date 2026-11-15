@@ -36,7 +36,7 @@ for (const [tag, source] of [...scripts, ...styles]) {
 // Hosted previews never connect to a visitor's local service.
 html = html.replace(
   "<head>",
-  `<head><script>if(location.protocol!=='file:'){const u=new URL(location.href);u.searchParams.set('demo','away');history.replaceState(null,'',u)}</script>`,
+  `<head><script>if(location.protocol!=='file:'){const u=new URL(location.href);if(!['away','wechat'].includes(u.searchParams.get('demo')))u.searchParams.set('demo','wechat');history.replaceState(null,'',u)}</script>`,
 );
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, html);
